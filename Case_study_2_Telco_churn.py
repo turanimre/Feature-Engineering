@@ -281,7 +281,10 @@ df.loc[~((df["PaymentMethod"] == "Credit card (automatic)") | (df["PaymentMethod
 
 df["tenure"].describe().T
 
-df["TenureCat"] = pd.qcut(df["tenure"], 4, labels=["Yeni", "Orta", "Eski", "Cok_Eski"])
+df.loc[df["tenure"] < 12, "TenureCat"] = "Yeni"
+df.loc[(df["tenure"] > 12) & (df["tenure"] < 24), "TenureCat"] = "Orta"
+df.loc[(df["tenure"] > 24) & (df["tenure"] < 36), "TenureCat"] = "Eski"
+df.loc[(df["tenure"] > 36), "TenureCat"] = "Cok_Eski"
 
 df["TenureCat"].value_counts()
 
@@ -293,3 +296,181 @@ df["NumOfExtraServices"] = df["OnlineSecurity"] + "_" + df["OnlineBackup"] + "_"
 
 df["NumOfExtraServices"] = [row.split("_") for row in df["NumOfExtraServices"]]
 df["NumOfExtraServices"] = [row.count("Yes") for row in df["NumOfExtraServices"]]
+
+
+# No phone service ve No internet service'i No ya dönüştürdük çünkü farklı bir değişkende Phone sevice ve Internet sevice alıp almadığını belirtiyorduk.
+
+for i in df.columns:
+    df[i] = ["No" if ((row == "No phone service") | (row == "No internet service")) else row for row in df[i]]
+
+
+
+
+### Adım 3: Encoding işlemlerini gerçekleştiriniz.
+
+
+df_encoding = df.copy()
+
+#### Encoding sadece yes-no olan değişkenleri encoding yapıyoruz get dummies yapınca fazla değişken oluşmaması için
+
+# list(df["Dependents"].unique()) # ["No", "Yes"]
+# list(df["Dependents"].unique()) # ["Yes", "No"]
+
+yes_no_cols = [col for col in df_encoding.columns if (list(df_encoding[col].unique()) == ["Yes", "No"]) | (list(df_encoding[col].unique()) == ["No", "Yes"])]
+
+for i in yes_no_cols:
+    df_encoding[i] = [1 if row == "Yes" else 0 for row in df_encoding[i]]
+
+df_encoding[yes_no_cols] = df_encoding[yes_no_cols].astype("uint8")
+
+#### Encoding with get_dummies
+
+cols_for_get_dummies = ["gender", "InternetService", "Contract", "PaymentMethod", "GenderCitizenCat", "AdditionalServices", "PayingBills", "PartnerDependents", "TenureCat", "NumOfExtraServices"]
+
+
+df_encoding = pd.get_dummies(df_encoding, columns=cols_for_get_dummies, drop_first=True)
+
+df_encoding.info()
+
+
+
+### Adım 4: Numerik değişkenler için standartlaştırma yapınız.
+
+df_standard = df_encoding.copy()
+
+ss = StandardScaler()
+
+for col in num_cols:
+    df_standard[[col]] = ss.fit_transform(df_standard[[col]])
+
+df_standard[num_cols]
+
+
+### Adım 5: Model oluşturunuz.
+
+from sklearn.datasets import load_iris
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.model_selection import GridSearchCV
+import warnings
+warnings.simplefilter(action="ignore")
+
+final_df = df_standard.copy()
+
+y = final_df[["Churn"]]
+X = final_df.drop(["Churn", "customerID"], axis=1)
+
+
+### Model Seçimi
+
+def evaluate_all_models(X, y):
+    """
+    X: özellik matrisi
+    y: hedef değişken
+    """
+    classifiers = [
+        LogisticRegression(),
+        DecisionTreeClassifier(),
+        RandomForestClassifier(),
+        SVC(),
+        KNeighborsClassifier(),
+        GaussianNB()
+    ]
+
+    for classifier in classifiers:
+        scores = cross_val_score(classifier, X, y, cv=5)
+        print(f"{type(classifier).__name__} accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+
+
+evaluate_all_models(X, y)
+
+
+# LogisticRegression accuracy: 0.80 (+/- 0.01)
+# DecisionTreeClassifier accuracy: 0.72 (+/- 0.02)
+# RandomForestClassifier accuracy: 0.79 (+/- 0.02)
+# SVC accuracy: 0.80 (+/- 0.02)
+# KNeighborsClassifier accuracy: 0.78 (+/- 0.02)
+# GaussianNB accuracy: 0.67 (+/- 0.01)
+
+
+### Model Tuning  LogisticRegression
+
+model = LogisticRegression()
+
+# Ayarlanacak hiperparametreler
+param_grid = {
+    'penalty': ['l1', 'l2', 'elasticnet', 'none'],
+    'C': [0.01, 0.1, 1, 10],
+    'solver': ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga'],
+    'max_iter': [100, 500, 1000, 5000]
+}
+
+# GridSearchCV nesnesini oluştur
+grid_search = GridSearchCV(model, param_grid, cv=5, n_jobs=-1)
+
+# Modeli eğit ve en iyi hiperparametreleri seç
+grid_search.fit(X, y)
+
+# En iyi hiperparametreleri ve accuracy sonucunu yazdır
+print("En iyi hiperparametreler: ", grid_search.best_params_)
+print("En iyi accuracy sonucu: ", grid_search.best_score_)
+
+# En iyi accuracy sonucu:  0.8060289893754152
+
+
+
+### Model Tuning  RandomForestClassifier
+
+model = RandomForestClassifier()
+
+# Ayarlanacak hiperparametreler
+param_grid = {
+    'n_estimators': [50, 100, 200, 500],
+    'max_features': ['sqrt', 'log2'],
+    'max_depth': [None, 5, 10, 20],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4]
+}
+
+# GridSearchCV nesnesini oluştur
+grid_search = GridSearchCV(model, param_grid, cv=5, n_jobs=-1)
+
+# Modeli eğit ve en iyi hiperparametreleri seç
+grid_search.fit(X, y)
+
+# En iyi hiperparametreleri ve accuracy sonucunu yazdır
+print("En iyi hiperparametreler: ", grid_search.best_params_)
+print("En iyi accuracy sonucu: ", grid_search.best_score_)
+
+# En iyi accuracy sonucu:  0.8017627772537435
+
+
+
+
+### Model Tuning  SVC
+
+model = SVC()
+
+
+# GridSearchCV için parametrelerin değerlerini belirleyelim
+param_grid = {
+    'C': [0.1, 1, 10],
+    'kernel': ['linear', 'rbf', 'poly'],
+    'gamma': ['scale', 'auto', 0.1, 0.01]
+}
+
+
+# GridSearchCV ile en iyi parametreleri bulalım
+grid_search = GridSearchCV(model, param_grid=param_grid, cv=5, n_jobs=-1)
+grid_search.fit(X, y)
+
+# En iyi parametreleri ve test seti skorunu yazdıralım
+print("En iyi parametreler: ", grid_search.best_params_)
+print("Test seti skoru: ", grid_search.best_score_)
+
+# Test seti skoru:  0.8017627772537435

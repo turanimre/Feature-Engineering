@@ -261,15 +261,15 @@ df.loc[(df["SeniorCitizen"] == 1) & (df["gender"] == "Male"), "GenderCitizenCat"
 
 # Müşterinin internet hizmetleri ile ilgili olarak herhangi bir ek hizmete sahip olup olmadığını gösterir.
 
-df["AdditionalServices"] = df["InternetService"] + df["OnlineSecurity"] + df["OnlineBackup"] + df["DeviceProtection"] + df["TechSupport"]
+df["AdditionalServices"] = df["InternetService"] + "_" + df["OnlineSecurity"] + "_" + df["OnlineBackup"] + "_" + df["DeviceProtection"] + "_" + df["TechSupport"]
 
 # Müşterinin fatura ödeme planı hakkında bilgi verir.
 
-df["PayingBills"] = df["Contract"] + df["PaperlessBilling"] + df["PaymentMethod"]
+df["PayingBills"] = df["Contract"] + "_" + df["PaperlessBilling"] + "_" + df["PaymentMethod"]
 
 # Müşterinin aile durumu hakkında bilgi verir.
 
-df["PartnerDependents"] = df["Partner"] + df["Dependents"]
+df["PartnerDependents"] = df["Partner"] + "_" + df["Dependents"]
 
 
 # PaymentMethod değişkeni üzerinden Ödeme otomatik mi değilmi üzerinden yeni bir kategorik değişken oluşturuyoruz.
@@ -277,3 +277,19 @@ df["PartnerDependents"] = df["Partner"] + df["Dependents"]
 df.loc[(df["PaymentMethod"] == "Credit card (automatic)") | (df["PaymentMethod"] == "Bank transfer (automatic)"), "AutomaticPayment"] = "Yes"
 df.loc[~((df["PaymentMethod"] == "Credit card (automatic)") | (df["PaymentMethod"] == "Bank transfer (automatic)")), "AutomaticPayment"] = "No"
 
+# Tenure Değişkenine göre müşterilerin yeni, orta, eski vb gibi categoriler oluşturacağız.
+
+df["tenure"].describe().T
+
+df["TenureCat"] = pd.qcut(df["tenure"], 4, labels=["Yeni", "Orta", "Eski", "Cok_Eski"])
+
+df["TenureCat"].value_counts()
+
+
+# Müşterinin ne kadar ek hizmet aldığı
+
+
+df["NumOfExtraServices"] = df["OnlineSecurity"] + "_" + df["OnlineBackup"] + "_" + df["DeviceProtection"] + "_" + df["TechSupport"] + "_" + df["StreamingTV"] + "_" + df["StreamingMovies"]
+
+df["NumOfExtraServices"] = [row.split("_") for row in df["NumOfExtraServices"]]
+df["NumOfExtraServices"] = [row.count("Yes") for row in df["NumOfExtraServices"]]

@@ -13,3 +13,5 @@ Bu hafta, veri bilimcilerin en önemli becerilerinden biri olan feature engineer
 CaseStudy 1. -- [Case_study_1_Diabetes_pred](https://github.com/turanimre/Feature-Engineering/blob/main/Case_study_1_Diabetes_pred.py)🔗
 
 CaseStudy 2. -- [Case_study_2_Telco_churn](https://github.com/turanimre/Feature-Engineering/blob/main/Case_study_2_Telco_churn.py)🔗
+
+## [Bootcamp All Contents](https://github.com/turanimre/VBO_datascience_bootcamp)🔗
